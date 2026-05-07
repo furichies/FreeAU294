@@ -1,0 +1,11 @@
+---
+webserver_packages:
+  - nginx
+  - php-fpm
+  - policycoreutils-python-utils
+
+webserver_port: 8080
+
+webserver_document_root: /var/www/html
+
+webserver_enable_status: true

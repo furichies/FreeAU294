@@ -1,0 +1,54 @@
+# Ejercicio 8.3: Optimización de ejecución Ansible
+# AU294 - Chapter 8: Securing your automation
+
+- name: Optimización de playbooks
+  hosts: managed
+  gather_facts: no
+  vars:
+    optimization_enabled: true
+    async_tasks: 3
+
+  tasks:
+    - name: Ejecutar múltiples tareas en paralelo (async)
+      ansible.builtin.yum:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - vim
+        - wget
+        - curl
+      async: "{{ async_tasks }}"
+      poll: 0
+      register: yum_jobs
+      when: optimization_enabled
+
+    - name: Esperar tareas asíncronas
+      ansible.builtin.async_status:
+        jid: "{{ item.ansible_job_id }}"
+      loop: "{{ yum_jobs.results }}"
+      register: job_results
+      until: job_results.finished
+      retries: 30
+      when: optimization_enabled
+
+    - name: Tarea conmitigación de forks
+      ansible.builtin.command: echo "Tarea optimizada"
+      environment:
+        ANSIBLE_FORKS: 10
+
+    - name: Usar filtro para selección inteligente
+      ansible.builtin.debug:
+        msg: |
+          Hosts de webservers:
+          {{ groups['webservers'] | map('regex_replace', '^', '10.10.10.') | list }}
+
+    - name: Configuración de caché de hechos
+      ansible.builtin.set_fact:
+        cached_time: "{{ ansible_facts.date_time.iso8601 }}"
+        processor_count: "{{ ansible_facts.processor_count }}"
+
+    - name: Mostrar facts en caché
+      ansible.builtin.debug:
+        msg: |
+          Tiempo caché: {{ cached_time }}
+          CPUs: {{ processor_count }}

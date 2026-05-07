@@ -1,0 +1,22 @@
+=================================================================================
+ {{ company_name | default("LAB AU294") }}
+ {{ project_name | default("Ansible Automation Course") }}
+=================================================================================
+
+Servidor: {{ inventory_hostname }}
+Direccion IP: {{ ansible_facts.default_ipv4.address | default("N/A") }}
+Sistema Operativo: {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}
+Kernel: {{ ansible_facts.kernel }}
+Arquitectura: {{ ansible_facts.architecture }}
+Fecha de conexion: {{ ansible_facts.date_time.iso8601 }}
+
+Estado del sistema:
+  - Usuarios conectados: {{ ansible_facts.user_id }}
+  - Memoria total: {{ (ansible_facts.memtotal_mb)|int / 1024|round(2) }} GB
+  - Memoria disponible: {{ (ansible_facts.memfree_mb)|int / 1024|round(2) }} GB
+  - CPU count: {{ ansible_facts.processor_count }}
+  - Carga promedio: {{ ansible_facts.processor_cores }}
+
+{{ message | default("Este sistema es propiedad de " + (company_name | default("LAB AU294")) + ". Uso no autorizado esta prohibido.") }}
+
+=================================================================================

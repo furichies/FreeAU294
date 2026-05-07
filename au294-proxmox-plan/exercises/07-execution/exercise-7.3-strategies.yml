@@ -1,0 +1,49 @@
+# Ejercicio 7.3: Estrategias de ejecución
+# AU294 - Chapter 7: Managing playbook execution
+
+- name: Estrategia linear (por defecto)
+  hosts: managed
+  gather_facts: no
+  strategy: linear
+
+  tasks:
+    - name: Paso 1 - Instalar paquete
+      ansible.builtin.dnf:
+        name: tree
+        state: present
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Paso 2 - Crear directorio
+      ansible.builtin.file:
+        path: /opt/linear-test
+        state: directory
+
+    - name: Paso 3 - Escribir archivo
+      ansible.builtin.copy:
+        content: "Estrategia linear"
+        dest: /opt/linear-test/strategy.txt
+
+- name: Estrategia free - ejecución paralela
+  hosts: managed
+  gather_facts: no
+  strategy: free
+
+  tasks:
+    - name: Ejecutar tarea en paralelo
+      ansible.builtin.debug:
+        msg: "Tarea paralela en {{ inventory_hostname }}"
+
+    - name: Demorar ligeramente
+      ansible.builtin.pause:
+        seconds: 2
+      when: false
+
+- name: Estrategia debug
+  hosts: managed
+  gather_facts: no
+  strategy: debug
+
+  tasks:
+    - name: Tarea con strategy debug
+      ansible.builtin.debug:
+        msg: "Estrategia debug - {{ inventory_hostname }}"

@@ -1,0 +1,45 @@
+---
+- name: Install NTP packages
+  ansible.builtin.yum:
+    name:
+      - chrony
+      - ntpdate
+    state: present
+  when: ansible_facts.os_family == "RedHat"
+
+- name: Configure NTP servers
+  ansible.builtin.lineinfile:
+    path: /etc/chrony.conf
+    regexp: "^server {{ item }}"
+    line: "server {{ item }}"
+    state: present
+  loop:
+    - 0.es.pool.ntp.org
+    - 1.es.pool.ntp.org
+    - 2.es.pool.ntp.org
+  when: ansible_facts.os_family == "RedHat"
+
+- name: Set timezone
+  ansible.builtin.command: timedatectl set-timezone {{ ntp_timezone | default('Europe/Madrid') }}
+  when: ansible_facts.os_family == "RedHat"
+
+- name: Start and enable chronyd
+  ansible.builtin.service:
+    name: chronyd
+    state: started
+    enabled: yes
+  when: ansible_facts.os_family == "RedHat"
+
+- name: Sync time immediately
+  ansible.builtin.command: chronyc -a makestep
+  changed_when: false
+  when: ansible_facts.os_family == "RedHat"
+
+- name: Verify NTP status
+  ansible.builtin.command: timedatectl
+  register: ntp_status
+  changed_when: false
+
+- name: Display NTP status
+  ansible.builtin.debug:
+    msg: "{{ ntp_status.stdout_lines }}"

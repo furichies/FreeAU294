@@ -1,0 +1,55 @@
+# Ejercicio 5.3: Plantillas anidadas e includes en templates
+# AU294 - Chapter 5: Writing Advanced Jinja2 Templates
+
+- name: Plantillas anidadas con includes
+  hosts: managed
+  gather_facts: yes
+  vars:
+    monitoring_services:
+      - name: nginx
+        port: 80
+        check_url: /health
+      - name: mysql
+        port: 3306
+        check_url: /
+      - name: redis
+        port: 6379
+        check_url: /ping
+    alert_contacts:
+      - email: ops@au294.local
+        pager: yes
+      - email: admin@au294.local
+        pager: no
+
+  tasks:
+    - name: Crear directorio para plantillas
+      ansible.builtin.file:
+        path: /opt/au294-monitoring
+        state: directory
+        mode: '0755'
+
+    - name: Generar configuración de Prometheus
+      ansible.builtin.template:
+        src: templates/prometheus.yml.j2
+        dest: /opt/au294-monitoring/prometheus.yml
+        mode: '0644'
+
+    - name: Generar configuración de alertas
+      ansible.builtin.template:
+        src: templates/alerts.yml.j2
+        dest: /opt/au294-monitoring/alerts.yml
+        mode: '0644'
+
+    - name: Generar dashboard JSON
+      ansible.builtin.template:
+        src: templates/dashboard.json.j2
+        dest: /opt/au294-monitoring/dashboard.json
+        mode: '0644'
+
+    - name: Verificar archivos generados
+      ansible.builtin.command: ls -la /opt/au294-monitoring/
+      changed_when: false
+
+    - name: Mostrar Prometheus config
+      ansible.builtin.command: cat /opt/au294-monitoring/prometheus.yml
+      changed_when: false

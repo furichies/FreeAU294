@@ -1,0 +1,84 @@
+# Ejercicio 5.2: Filtros Jinja2 Avanzados
+# AU294 - Chapter 5: Writing Advanced Jinja2 Templates
+
+- name: Demostrar filtros Jinja2 avanzados
+  hosts: managed
+  gather_facts: yes
+  vars:
+    json_data:
+      server: web01
+      ip: 10.10.10.11
+      services: [nginx, mysql, redis]
+
+  tasks:
+    - name: Mostrar filtros de conversión
+      ansible.builtin.debug:
+        msg: |
+          to_json: {{ json_data | to_json }}
+          from_json: {{ '{"key": "value"}' | from_json }}
+          to_yaml: {{ json_data | to_yaml }}
+          to_nice_yaml: {{ json_data | to_nice_yaml }}
+
+    - name: Mostrar filtros de texto
+      ansible.builtin.debug:
+        msg: |
+          upper: {{ 'hello world' | upper }}
+          lower: {{ 'HELLO WORLD' | lower }}
+          capitalize: {{ 'hello world' | capitalize }}
+          title: {{ 'hello world' | title }}
+          reverse: {{ 'hello' | reverse }}
+          replace: {{ 'hello world' | replace('world', 'au294') }}
+
+    - name: Mostrar filtros de lista
+      ansible.builtin.debug:
+        msg: |
+          join: {{ ['a', 'b', 'c'] | join(', ') }}
+          first: {{ [1, 2, 3] | first }}
+          last: {{ [1, 2, 3] | last }}
+          length: {{ [1, 2, 3] | length }}
+          unique: {{ [1, 2, 2, 3] | unique }}
+          sort: {{ [3, 1, 2] | sort }}
+          map: {{ ['a', 'b'] | map('upper') | list }}
+
+    - name: Mostrar filtros de IP
+      ansible.builtin.debug:
+        msg: |
+          ipaddr: {{ '10.10.10.11' | ipaddr }}
+          ipaddr('network'): {{ '10.10.10.11/24' | ipaddr('network') }}
+          ipaddr('netmask'): {{ '10.10.10.0/24' | ipaddr('netmask') }}
+
+    - name: Mostrar filtros de fecha/hora
+      ansible.builtin.debug:
+        msg: |
+          strftime: {{ ansible_facts.date_time.iso8601 | to_datetime | strftime('%Y-%m-%d %H:%M') }}
+          to_datetime: {{ '2024-01-15' | to_datetime('%Y-%m-%d') }}
+          days_diff: {{ (ansible_facts.date_time.iso8601 | to_datetime - '2024-01-01' | to_datetime).days }}
+
+    - name: Mostrar filtros matemáticos
+      ansible.builtin.debug:
+        msg: |
+          max: {{ [1, 5, 3] | max }}
+          min: {{ [1, 5, 3] | min }}
+          round: {{ 3.14159 | round(2) }}
+          abs: {{ -5 | abs }}
+
+    - name: Generar reporte con filtros
+      ansible.builtin.copy:
+        content: |
+          Reporte de Sistema AU294
+          ======================
+          Generado: {{ ansible_facts.date_time.iso8601 }}
+          Servidor: {{ ansible_facts.hostname | upper }}
+
+          Resumen de Red:
+          {% for iface in ansible_facts.interfaces %}
+          - {{ iface }}: {{ ansible_facts[iface] | json_query('*.address') | join(' ') }}
+          {% endfor %}
+
+          Servicios: {{ json_data.services | join(', ') }}
+        dest: /tmp/filters-report.txt
+        mode: '0644'
+
+    - name: Verificar reporte
+      ansible.builtin.command: cat /tmp/filters-report.txt
+      changed_when: false

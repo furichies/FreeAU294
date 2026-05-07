@@ -1,0 +1,30 @@
+server {
+    listen {{ webserver_port | default(8080) }};
+    server_name {{ ansible_facts.hostname }}.au294.local;
+
+    root {{ webserver_document_root | default('/var/www/html') }};
+    index index.html index.htm;
+
+    access_log /var/log/nginx/{{ inventory_hostname }}_access.log;
+    error_log /var/log/nginx/{{ inventory_hostname }}_error.log;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /health {
+        access_log off;
+        return 200 "OK\n";
+        add_header Content-Type text/plain;
+    }
+
+    {% if webserver_enable_status | default(true) %}
+    location /status {
+        stub_status on;
+        access_log off;
+        allow 127.0.0.1;
+        allow 10.10.10.0/24;
+        deny all;
+    }
+    {% endif %}
+}

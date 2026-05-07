@@ -1,0 +1,72 @@
+# Ejercicio 8.1: Ansible Vault - Gestión de secretos
+# AU294 - Chapter 8: Securing your automation
+
+- name: Gestión de secretos con Ansible Vault
+  hosts: managed
+  gather_facts: yes
+  vars_files:
+    - /opt/au294-vault/vault.yml
+
+  tasks:
+    - name: Verificar directorio de vault
+      ansible.builtin.file:
+        path: /opt/au294-vault
+        state: directory
+        mode: '0700'
+
+    - name: Mostrar提示 (descomentar para ver)
+      ansible.builtin.debug:
+        msg: |
+          Credenciales cargadas:
+          - DB Password: {{ db_password }}
+          - API Key: {{ api_key }}
+          - SSL Cert: {{ ssl_cert_path }}
+      when: false
+
+    - name: Crear usuario con contraseña de vault
+      ansible.builtin.user:
+        name: app_user
+        comment: "Usuario de aplicación"
+        password: "{{ db_password | password_hash('sha512') }}"
+      when: false
+
+    - name: Crear directorio SSL seguro
+      ansible.builtin.file:
+        path: /etc/pki/app-secrets
+        state: directory
+        mode: '0700'
+        owner: root
+        group: root
+
+    - name: Almacenar secreto en archivo
+      ansible.builtin.copy:
+        content: "{{ db_password }}"
+        dest: /etc/pki/app-secrets/db-pass.txt
+        mode: '0600'
+        owner: root
+        group: root
+      when: false
+
+    - name: Configurar variables sensibles
+      ansible.builtin.set_fact:
+        sensitive_data: "{{ api_key }}"
+        masked_data: "{{ db_password[0:3] ~ '***' ~ db_password[-3:] }}"
+
+    - name: Mostrar datos enmascarados
+      ansible.builtin.debug:
+        msg: "API Key: {{ masked_data }}"
+
+- name: Validación de vault
+  hosts: control
+  gather_facts: no
+
+  tasks:
+    - name: Verificar archivo vault cifrado
+      ansible.builtin.command: file /opt/au294-vault/vault.yml
+      register: vault_file
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar tipo de archivo
+      ansible.builtin.debug:
+        msg: "Vault file: {{ vault_file.stdout }}"

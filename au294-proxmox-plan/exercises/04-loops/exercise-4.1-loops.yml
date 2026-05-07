@@ -1,0 +1,72 @@
+# Ejercicio 4.1: Uso de Loops
+# AU294 - Chapter 4: Task Control with Loops and Conditionals
+
+- name: Uso de Loops en Ansible
+  hosts: managed
+  gather_facts: yes
+  vars:
+    dev_packages:
+      - vim
+      - git
+      - wget
+      - curl
+      - tree
+      - htop
+      - net-tools
+    monitoring_users:
+      - { name: monitor, comment: "User de monitoreo", shell: /bin/bash }
+      - { name: alerts, comment: "User de alertas", shell: /bin/false }
+      - { name: backup, comment: "User de backup", shell: /bin/bash }
+
+  tasks:
+    - name: Instalar múltiples paquetes con loop simple
+      ansible.builtin.yum:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ dev_packages }}"
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Crear usuarios con loop complejo
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        comment: "{{ item.comment }}"
+        shell: "{{ item.shell }}"
+        create_home: yes
+      loop: "{{ monitoring_users }}"
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Crear directorios con loop
+      ansible.builtin.file:
+        path: "/opt/au294-data/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - logs
+        - cache
+        - tmp
+        - backups
+
+    - name: Configurar múltiples servicios con loop
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - sshd
+        - firewalld
+        - rsyslog
+
+    - name: Usar loop con diccionario
+      ansible.builtin.debug:
+        msg: "Grupo {{ item.key }} = {{ item.value }}"
+      loop:
+        - { key: 'webservers', value: 'nginx/apache' }
+        - { key: 'dbservers', value: 'mariadb/postgresql' }
+        - { key: 'appservers', value: 'nodejs/python' }
+
+    - name: Usar until para reintentos
+      ansible.builtin.shell: echo "Intentando conexión..."
+      register: result
+      until: result.stdout is defined
+      retries: 3
+      delay: 1

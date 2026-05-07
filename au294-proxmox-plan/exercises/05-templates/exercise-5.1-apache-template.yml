@@ -1,0 +1,73 @@
+# Ejercicio 5.1: Plantillas Jinja2 Avanzadas - Configuración Apache
+# AU294 - Chapter 5: Writing Advanced Jinja2 Templates
+
+- name: Generación de configuración Apache con plantillas
+  hosts: webservers
+  gather_facts: yes
+  vars:
+    http_port: 80
+    https_port: 443
+    server_name: au294.lab.local
+    document_root: /var/www/html
+    enable_ssl: true
+    ssl_cert_path: /etc/pki/tls/certs/localhost.crt
+    ssl_key_path: /etc/pki/tls/private/localhost.key
+    allowed_ips:
+      - 10.10.10.0/24
+      - 192.168.1.0/24
+    max_clients: 150
+    timeout: 60
+    enable_compression: true
+
+  tasks:
+    - name: Instalar Apache
+      ansible.builtin.yum:
+        name: httpd
+        state: present
+
+    - name: Instalar mod_ssl para HTTPS
+      ansible.builtin.yum:
+        name: mod_ssl
+        state: present
+      when: enable_ssl | bool
+
+    - name: Generar certificado SSL autofirmado
+      ansible.builtin.command: >
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048
+        -keyout {{ ssl_key_path }}
+        -out {{ ssl_cert_path }}
+        -subj "/C=ES/ST=Madrid/L=Madrid/O=AU294/CN={{ server_name }}"
+      args:
+        creates: "{{ ssl_cert_path }}"
+      when: enable_ssl | bool
+
+    - name: Desplegar configuración de Apache
+      ansible.builtin.template:
+        src: templates/apache-vhost.conf.j2
+        dest: /etc/httpd/conf.d/au294.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart httpd
+
+    - name: Verificar sintaxis de configuración
+      ansible.builtin.command: httpd -t
+      register: httpd_test
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar resultado de verificación
+      ansible.builtin.debug:
+        msg: "Configuración Apache: {{ httpd_test.stdout_lines | join(' ') }}"
+
+    - name: Iniciar Apache
+      ansible.builtin.service:
+        name: httpd
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart httpd
+      ansible.builtin.service:
+        name: httpd
+        state: restarted

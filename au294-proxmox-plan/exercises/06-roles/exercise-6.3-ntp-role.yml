@@ -1,0 +1,33 @@
+# Ejercicio 6.3: Crear rol de configuración NTP
+# AU294 - Chapter 6: Ansible Roles
+
+- name: Desplegar configuración NTP a todos los nodos
+  hosts: all
+  gather_facts: yes
+
+  tasks:
+    - name: Incluir rol ntp-config
+      ansible.builtin.include_role:
+        name: ntp-config
+
+- name: Verificar configuración NTP
+  hosts: all
+  gather_facts: yes
+
+  tasks:
+    - name: Mostrar zona horaria configurada
+      ansible.builtin.command: timedatectl | grep -E 'Time zone|Local time'
+      register: tz_output
+      changed_when: false
+
+    - name: Mostrar servidores NTP
+      ansible.builtin.command: chronyc sources 2>/dev/null || ntpq -p 2>/dev/null || echo "NTP no disponible"
+      register: ntp_sources
+      changed_when: false
+      failed_when: false
+
+    - name: Verificar sincronización
+      ansible.builtin.debug:
+        msg: |
+          Zona Horaria: {{ tz_output.stdout }}
+          Fuentes NTP: {{ ntp_sources.stdout_lines[:3] }}

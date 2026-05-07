@@ -1,0 +1,6 @@
+---
+ntp_timezone: Europe/Madrid
+ntp_servers:
+  - 0.es.pool.ntp.org
+  - 1.es.pool.ntp.org
+  - 2.es.pool.ntp.org

@@ -1,0 +1,117 @@
+# Ejercicio 9.1: Gestión de usuarios y grupos
+# AU294 - Chapter 9: Automation for RHCE/RHCSA Linux Administration
+
+- name: Gestión completa de usuarios y grupos
+  hosts: managed
+  gather_facts: yes
+  vars:
+    system_groups:
+      - name: developers
+        gid: 5000
+        state: present
+      - name: dba
+        gid: 5001
+        state: present
+      - name: analysts
+        gid: 5002
+        state: present
+
+    system_users:
+      - name: john
+        comment: "John Developer"
+        group: developers
+        shell: /bin/bash
+        password: "{{ 'Pass123!' | password_hash('sha512') }}"
+        ssh_key: "{{ lookup('file', '/root/.ssh/id_rsa.pub') }}"
+        state: present
+      - name: sarah
+        comment: "Sarah DBA"
+        group: dba
+        shell: /bin/bash
+        password: "{{ 'Pass123!' | password_hash('sha512') }}"
+        state: present
+      - name: analyst1
+        comment: "Data Analyst"
+        group: analysts
+        shell: /bin/bash
+        password: "{{ 'Pass123!' | password_hash('sha512') }}"
+        state: present
+
+  tasks:
+    - name: Crear grupos del sistema
+      ansible.builtin.group:
+        name: "{{ item.name }}"
+        gid: "{{ item.gid }}"
+        state: "{{ item.state }}"
+      loop: "{{ system_groups }}"
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Verificar grupos creados
+      ansible.builtin.command: grep -E 'developers|dba|analysts' /etc/group
+      register: group_check
+      changed_when: false
+
+    - name: Mostrar grupos
+      ansible.builtin.debug:
+        var: group_check.stdout_lines
+
+    - name: Crear usuarios del sistema
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        comment: "{{ item.comment }}"
+        group: "{{ item.group }}"
+        shell: "{{ item.shell }}"
+        password: "{{ item.password }}"
+        expires: -1
+        state: "{{ item.state }}"
+      loop: "{{ system_users }}"
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Agregar clave SSH a usuarios
+      ansible.builtin.authorized_key:
+        user: "{{ item.name }}"
+        key: "{{ item.ssh_key }}"
+        state: present
+      loop: "{{ system_users }}"
+      when: item.ssh_key is defined and item.ssh_key != ''
+
+    - name: Configurar sudo para grupos
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ item.group }}"
+        content: |
+          # Grupo {{ item.group }} puede ejecutar comandos sudo
+          %{{ item.group }} ALL=(ALL) NOPASSWD: ALL
+        mode: '0440'
+        validate: 'visudo -cf %s'
+      loop: "{{ system_groups }}"
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Generar reporte de usuarios
+      ansible.builtin.copy:
+        content: |
+          Reporte de Usuarios - AU294
+          ============================
+          Fecha: {{ ansible_facts.date_time.iso8601 }}
+          Servidor: {{ ansible_facts.hostname }}
+
+          {% for user in system_users %}
+          Usuario: {{ user.name }}
+            Nombre: {{ user.comment }}
+            Grupo: {{ user.group }}
+            Shell: {{ user.shell }}
+          {% endfor %}
+        dest: /opt/au294-config/users-report.txt
+        mode: '0644'
+
+    - name: Eliminar usuario de prueba (si existe)
+      ansible.builtin.user:
+        name: testuser
+        state: absent
+        remove: yes
+      when: false
+
+    - name: Modificar usuario existente
+      ansible.builtin.user:
+        name: root
+        comment: "Super Usuario - {{ ansible_facts.hostname }}"
+      when: false

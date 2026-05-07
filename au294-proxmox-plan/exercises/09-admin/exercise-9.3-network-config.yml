@@ -1,0 +1,99 @@
+# Ejercicio 9.3: Configuración de red
+# AU294 - Chapter 9: Automation for RHCE/RHCSA Linux Administration
+
+- name: Configuración de red con Ansible
+  hosts: managed
+  gather_facts: yes
+  vars:
+    lab_interface: eth1
+    lab_ip: "{{ ansible_facts[lab_interface].ipv4.address if ansible_facts[lab_interface] is defined else '10.10.10.11' }}"
+    lab_netmask: 255.255.255.0
+    lab_gateway: 10.10.10.1
+    lab_dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    lab_search_domain: au294.local
+
+  tasks:
+    - name: Mostrar información de red actual
+      ansible.builtin.debug:
+        msg: |
+          Interfaces de red:
+          {% for iface in ansible_facts.interfaces %}
+          - {{ iface }}: {{ ansible_facts[iface].ipv4.address | default('N/A') }}
+          {% endfor %}
+
+    - name: Verificar conexión gateway
+      ansible.builtin.ping:
+        dest: "{{ lab_gateway }}"
+        timeout: 5
+      register: gateway_ping
+      failed_when: false
+
+    - name: Mostrar resultado ping gateway
+      ansible.builtin.debug:
+        msg: "Gateway {{ lab_gateway }} reachable: {{ gateway_ping.get('unreachable', 'unknown') != True }}"
+
+    - name: Configurar DNS (NetworkManager)
+      ansible.builtin.copy:
+        content: |
+          [main]
+          dns=none
+        dest: /etc/NetworkManager/conf.d/ansible-dns.conf
+        mode: '0644'
+      notify: Restart NetworkManager
+      when: false
+
+    - name: Configurar resolución DNS
+      ansible.builtin.lineinfile:
+        path: /etc/resolv.conf
+        regexp: '^nameserver'
+        line: "nameserver {{ item }}"
+        insertbefore: '^nameserver'
+      loop: "{{ lab_dns }}"
+      when: false
+
+    - name: Agregar dominio de búsqueda
+      ansible.builtin.lineinfile:
+        path: /etc/resolv.conf
+        regexp: '^search'
+        line: "search {{ lab_search_domain }}"
+        state: present
+      when: false
+
+    - name: Verificar conectividad DNS
+      ansible.builtin.command: nslookup google.com 8.8.8.8 2>/dev/null | head -5 || echo "DNS lookup skipped"
+      register: dns_test
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar resultado DNS
+      ansible.builtin.debug:
+        msg: "{{ dns_test.stdout_lines[:5] }}"
+
+    - name: Generar reporte de red
+      ansible.builtin.copy:
+        content: |
+          Reporte de Red - AU294
+          ======================
+          Fecha: {{ ansible_facts.date_time.iso8601 }}
+          Servidor: {{ ansible_facts.hostname }}
+
+          Interfaces:
+          {% for iface in ansible_facts.interfaces %}
+          {{ iface }}:
+            IP: {{ ansible_facts[iface].ipv4.address | default('N/A') }}
+            MAC: {{ ansible_facts[iface].macaddress | default('N/A') }}
+            MTU: {{ ansible_facts[iface].mtu | default('N/A') }}
+          {% endfor %}
+
+          DNS: {{ lab_dns | join(', ') }}
+          Search Domain: {{ lab_search_domain }}
+        dest: /opt/au294-config/network-report.txt
+        mode: '0644'
+
+  handlers:
+    - name: Restart NetworkManager
+      ansible.builtin.service:
+        name: NetworkManager
+        state: restarted

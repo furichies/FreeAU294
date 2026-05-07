@@ -1,0 +1,66 @@
+# Ejercicio 10.2: Integración con API de Proxmox
+# AU294 - Chapter 10: Integration with other technologies
+
+- name: Integración con Proxmox API
+  hosts: control
+  gather_facts: yes
+  vars:
+    proxmox_api_host: "{{ lookup('env', 'PROXMOX_HOST') | default('localhost') }}"
+    proxmox_api_port: 8006
+    proxmox_user: root@pam
+    proxmox_password: "{{ lookup('env', 'PROXMOX_PASSWORD') | default('password') }}"
+
+  tasks:
+    - name: Obtener ticket de autenticación
+      ansible.builtin.uri:
+        url: "https://{{ proxmox_api_host }}:{{ proxmox_api_port }}/api2/json/access/ticket"
+        method: POST
+        body_format: form_urlencoded
+        body:
+          username: "{{ proxmox_user }}"
+          password: "{{ proxmox_password }}"
+        validate_certs: no
+        register: proxmox_auth
+        failed_when: false
+
+    - name: Mostrar estado de autenticación
+      ansible.builtin.debug:
+        msg: |
+          Proxmox API: {{ proxmox_api_host }}:{{ proxmox_api_port }}
+          Autenticación: {{ 'OK' if proxmox_auth.get('json', {}).get('data') is defined else 'Fallida' }}
+
+    - name: Verificar cluster
+      ansible.builtin.command: pvesh get /cluster/status --output-format=json 2>/dev/null | head -20 || echo '{"error": "No accessible"}'
+      register: cluster_status
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar estado del cluster
+      ansible.builtin.debug:
+        msg: "{{ cluster_status.stdout_lines[:10] }}"
+
+    - name: Listar VMs
+      ansible.builtin.command: qm list 2>/dev/null || echo "No VMs found"
+      register: vm_list
+      changed_when: false
+
+    - name: Mostrar lista de VMs
+      ansible.builtin.debug:
+        msg: "VMs en el laboratorio:\n{{ vm_list.stdout }}"
+
+    - name: Generar reporte de integración
+      ansible.builtin.copy:
+        content: |
+          Reporte de Integración Proxmox - AU294
+          =====================================
+          Fecha: {{ ansible_facts.date_time.iso8601 }}
+          Host Ansible: {{ ansible_facts.hostname }}
+
+          Configuración:
+          - Proxmox API: {{ proxmox_api_host }}:{{ proxmox_api_port }}
+          - Usuario: {{ proxmox_user }}
+
+          VMs:
+          {{ vm_list.stdout }}
+        dest: /opt/au294-config/proxmox-report.txt
+        mode: '0644'

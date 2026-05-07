@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'au294-lab'
+    environment: '{{ environment | default("development") }}'
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets:
+        {% for host in groups['managed'] %}
+          - '{{ hostvars[host].ansible_host | default(hostvars[host].ansible_facts.default_ipv4.address) }}:9100'
+        {% endfor %}
+
+  - job_name: 'monitoring_services'
+    static_configs:
+      - targets:
+        {% for svc in monitoring_services %}
+          - '{{ svc.name }}.{{ inventory_hostname }}:{{ svc.port }}'
+        {% endfor %}
+        labels:
+          group: 'services'

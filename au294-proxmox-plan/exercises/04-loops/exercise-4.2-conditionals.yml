@@ -1,0 +1,80 @@
+# Ejercicio 4.2: Condicionales
+# AU294 - Chapter 4: Task Control with Loops and Conditionals
+
+- name: Uso de Condicionales en Ansible
+  hosts: managed
+  gather_facts: yes
+  vars:
+    enable_monitoring: true
+    enable_backups: false
+    node_type: webserver
+
+  tasks:
+    - name: Verificar distribución del SO
+      ansible.builtin.debug:
+        msg: |
+          Distribución: {{ ansible_facts.distribution }}
+          Versión: {{ ansible_facts.distribution_version }}
+          Familia: {{ ansible_facts.os_family }}
+
+    - name: Instalar paquetes solo en RedHat
+      ansible.builtin.yum:
+        name:
+          - httpd
+          - mod_ssl
+        state: present
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Crear usuario específico según tipo de nodo
+      ansible.builtin.user:
+        name: "{{ node_type }}-manager"
+        comment: "Manager para {{ node_type }}"
+        state: present
+      when: node_type == "webserver"
+
+    - name: Configurar monitoreo solo si está habilitado
+      ansible.builtin.yum:
+        name: prometheus
+        state: present
+      when: enable_monitoring | bool
+      failed_when: false
+
+    - name: Tarea condicional con variable booleana
+      ansible.builtin.debug:
+        msg: "Monitoreo {{ 'habilitado' if enable_monitoring else 'deshabilitado' }}"
+      when: enable_monitoring is defined
+
+    - name: Usar múltiples condiciones con and
+      ansible.builtin.debug:
+        msg: "Condiciones cumplidas: SO={{ ansible_facts.os_family }}, RAM={{ ansible_facts.memtotal_mb }}MB"
+      when:
+        - ansible_facts.os_family == "RedHat"
+        - ansible_facts.memtotal_mb >= 1024
+
+    - name: Usar múltiples condiciones con or
+      ansible.builtin.debug:
+        msg: "Este es un nodo importante"
+      when:
+        - inventory_hostname in groups['control']
+        - or ansible_facts.memtotal_mb >= 2048
+
+    - name: Condición con comparación numérica
+      ansible.builtin.debug:
+        msg: "Memoria suficiente para el laboratorio"
+      when: ansible_facts.memtotal_mb | int >= 1536
+
+    - name: Registrar resultado y usar en condición
+      ansible.builtin.command: systemctl is-active sshd
+      register: sshd_status
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar estado de SSH
+      ansible.builtin.debug:
+        msg: "SSH está {{ sshd_status.stdout }}"
+      when: sshd_status.stdout is defined
+
+    - name: Usar register con condición
+      ansible.builtin.debug:
+        msg: "Este mensaje solo aparece si hay registros"
+      when: sshd_status is defined

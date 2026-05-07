@@ -1,0 +1,28 @@
+---
+# Variables específicas para nodos gestionados
+managed_description: "Nodos gestionados por Ansible en el laboratorio AU294"
+managed_tag: ansible-managed
+
+# Paquetes base a instalar en todos los managed
+base_packages:
+  - vim
+  - wget
+  - curl
+  - tree
+  - net-tools
+  - bind-utils
+
+# Configuración de usuarios
+create_service_users: true
+service_users:
+  - { name: ansible-monitor, shell: /bin/bash, comment: "Ansible monitoring user" }
+
+# Configuración de logs
+rsyslog_enabled: true
+log_rotation_days: 7
+
+# Configuración de cron
+cron_jobs:
+  - name: "Limpiar logs antiguos"
+    job: "find /var/log -type f -name '*.log' -mtime +30 -delete"
+    schedule: "0 2 * * *"

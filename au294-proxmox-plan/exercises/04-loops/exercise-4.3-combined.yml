@@ -1,0 +1,81 @@
+# Ejercicio 4.3: Combinación de Loops y Condicionales
+# AU294 - Chapter 4: Task Control with Loops and Conditionals
+
+- name: Loops y Condicionales Combinados
+  hosts: managed
+  gather_facts: yes
+  vars:
+    services_config:
+      - name: nginx
+        port: 80
+        enabled: true
+        type: web
+      - name: mysql
+        port: 3306
+        enabled: false
+        type: database
+      - name: redis
+        port: 6379
+        enabled: true
+        type: cache
+      - name: postfix
+        port: 25
+        enabled: false
+        type: mail
+
+  tasks:
+    - name: Mostrar servicios a configurar
+      ansible.builtin.debug:
+        msg: |
+          Servicios configurados:
+          {% for svc in services_config %}
+          - {{ svc.name }} (puerto {{ svc.port }}, {{ svc.type }})
+          {% endfor %}
+
+    - name: Instalar servicios solo si están habilitados
+      ansible.builtin.yum:
+        name: "{{ item.name }}"
+        state: present
+      loop: "{{ services_config }}"
+      when: item.enabled | bool
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Asegurar que servicios habilitados estén activos
+      ansible.builtin.service:
+        name: "{{ item.name }}"
+        state: started
+        enabled: "{{ item.enabled }}"
+      loop: "{{ services_config }}"
+      when: item.enabled | bool and ansible_facts.os_family == "RedHat"
+
+    - name: Configurar firewall para servicios web
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - http
+        - https
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Generar reporte de configuración
+      ansible.builtin.copy:
+        content: |
+          Reporte de Servicios AU294
+          =========================
+          Fecha: {{ ansible_facts.date_time.iso8601 }}
+          Servidor: {{ ansible_facts.hostname }}
+
+          {% for svc in services_config %}
+          Servicio: {{ svc.name }}
+            Puerto: {{ svc.port }}
+            Tipo: {{ svc.type }}
+            Habilitado: {{ 'Si' if svc.enabled else 'No' }}
+          {% endfor %}
+        dest: /opt/au294-config/services-report.txt
+        mode: '0644'
+
+    - name: Verificar reporte
+      ansible.builtin.command: cat /opt/au294-config/services-report.txt
+      changed_when: false

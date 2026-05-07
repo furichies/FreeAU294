@@ -1,0 +1,54 @@
+# Ejercicio 1.3: Inventario Estático y Dinámico
+# AU294 - Chapter 1: Introduction to Ansible
+
+- name: Explorar y validar inventario
+  hosts: localhost
+  gather_facts: no
+  vars:
+    inventory_file: "{{ playbook_dir }}/../inventory/inventory.ini"
+
+  tasks:
+    - name: Verificar que existe el archivo de inventario
+      ansible.builtin.stat:
+        path: "{{ inventory_file }}"
+      register: inv_file
+
+    - name: Mostrar contenido del inventario
+      ansible.builtin.command: cat "{{ inventory_file }}"
+      register: inv_content
+      changed_when: false
+      when: inv_file.stat.exists
+
+    - name: Mostrar inventario
+      ansible.builtin.debug:
+        msg: "{{ inv_content.stdout_lines }}"
+
+    - name: Listar todos los hosts del inventario
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        groups: discovered
+      loop:
+        - managed-node-01
+        - managed-node-02
+        - managed-node-03
+
+- name: Probar conectividad con todos los hosts
+  hosts: discovered
+  gather_facts: yes
+  tasks:
+    - name: Ping a cada nodo
+      ansible.builtin.ping:
+      register: ping_result
+
+    - name: Mostrar resultado del ping
+      ansible.builtin.debug:
+        msg: "Host {{ inventory_hostname }}: {{ ping_result }}"
+
+    - name: Recopilar hechos de cada nodo
+      ansible.builtin.debug:
+        msg: |
+          {{ inventory_hostname }}:
+            IP: {{ ansible_facts.default_ipv4.address }}
+            SO: {{ ansible_facts.os_family }}
+            Memoria: {{ ansible_facts.memtotal_mb }}MB
+            CPUs: {{ ansible_facts.processor_count }}

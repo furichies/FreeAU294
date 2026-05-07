@@ -1,0 +1,50 @@
+# Ejercicio 6.2: Ansible Galaxy
+# AU294 - Chapter 6: Ansible Roles
+
+- name: Usar roles de Ansible Galaxy
+  hosts: managed
+  gather_facts: yes
+  vars:
+    galaxy_roles:
+      - name: geerlingguy.ntp
+        version: "3.0.0"
+      - name: geerlingguy.firewall
+        version: "3.3.0"
+
+  tasks:
+    - name: Mostrar directorio de roles
+      ansible.builtin.command: ls -la {{ playbook_dir }}/../roles/
+      register: roles_dir
+      changed_when: false
+
+    - name: Listar roles instalados
+      ansible.builtin.debug:
+        msg: "{{ roles_dir.stdout_lines }}"
+
+    - name: Verificar si existe rol NTP
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../roles/ntp"
+      register: ntp_role
+
+    - name: Descargar rol NTP con ansible-galaxy
+      ansible.builtin.command: ansible-galaxy install geerlingguy.ntp -p {{ playbook_dir }}/../roles
+      when: not ntp_role.stat.exists
+      failed_when: false
+
+    - name: Incluir rol NTP
+      ansible.builtin.include_role:
+        name: geerlingguy.ntp
+      vars:
+        ntp_timezone: Europe/Madrid
+        ntpServers:
+          - 0.es.pool.ntp.org
+          - 1.es.pool.ntp.org
+
+    - name: Verificar sync NTP
+      ansible.builtin.command: timedatectl status
+      register: ntp_status
+      changed_when: false
+
+    - name: Mostrar estado NTP
+      ansible.builtin.debug:
+        msg: "{{ ntp_status.stdout_lines }}"

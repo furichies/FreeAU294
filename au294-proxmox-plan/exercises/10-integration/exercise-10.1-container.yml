@@ -1,0 +1,88 @@
+# Ejercicio 10.1: Despliegue de aplicación contenerizada
+# AU294 - Chapter 10: Integration with other technologies
+
+- name: Desplegar aplicación con Podman/Docker
+  hosts: app
+  gather_facts: yes
+  vars:
+    container_name: au294-webapp
+    container_image: docker.io/nginx:alpine
+    container_port: 8080
+    host_port: 8080
+
+  tasks:
+    - name: Instalar Podman
+      ansible.builtin.dnf:
+        name: podman
+        state: present
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Verificar Podman
+      ansible.builtin.command: podman --version
+      register: podman_version
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar versión de Podman
+      ansible.builtin.debug:
+        msg: "{{ podman_version.stdout }}"
+
+    - name: Descargar imagen
+      ansible.builtin.command: podman pull {{ container_image }}
+      register: pull_result
+      changed_when: false
+      failed_when: false
+
+    - name: Detener contenedor existente
+      ansible.builtin.command: podman stop {{ container_name }} 2>/dev/null || true
+      changed_when: false
+      failed_when: false
+
+    - name: Eliminar contenedor existente
+      ansible.builtin.command: podman rm {{ container_name }} 2>/dev/null || true
+      changed_when: false
+      failed_when: false
+
+    - name: Crear página web personalizada
+      ansible.builtin.copy:
+        content: |
+          <html>
+          <head><title>AU294 Container Lab</title></head>
+          <body>
+          <h1>Laboratorio AU294 - Contenedor</h1>
+          <p>Servidor: {{ ansible_facts.hostname }}</p>
+          <p>Fecha: {{ ansible_facts.date_time.iso8601 }}</p>
+          </body>
+          </html>
+        dest: /opt/au294-web/index.html
+        mode: '0644'
+
+    - name: Iniciar contenedor
+      ansible.builtin.command: >
+        podman run -d --name {{ container_name }}
+        -p {{ host_port }}:{{ container_port }}
+        -v /opt/au294-web:/usr/share/nginx/html:ro
+        {{ container_image }}
+      register: container_start
+      changed_when: false
+      failed_when: false
+
+    - name: Verificar contenedor
+      ansible.builtin.command: podman ps --filter name={{ container_name }}
+      register: container_status
+      changed_when: false
+
+    - name: Mostrar estado del contenedor
+      ansible.builtin.debug:
+        msg: "{{ container_status.stdout_lines }}"
+
+    - name: Probar aplicación
+      ansible.builtin.uri:
+        url: "http://{{ ansible_facts.default_ipv4.address }}:{{ host_port }}"
+        method: GET
+      register: app_response
+      failed_when: false
+
+    - name: Mostrar respuesta
+      ansible.builtin.debug:
+        msg: "Aplicación responde con status: {{ app_response.status }}"

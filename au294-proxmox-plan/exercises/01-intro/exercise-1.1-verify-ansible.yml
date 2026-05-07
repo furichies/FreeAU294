@@ -1,0 +1,59 @@
+# Ejercicio 1.1: Verificar Instalación de Ansible
+# AU294 - Chapter 1: Introduction to Ansible
+
+- name: Verificar instalación de Ansible
+  hosts: control
+  gather_facts: yes
+  vars:
+    ansible_install_dir: /usr/local/bin
+    required_version: "2.14"
+
+  tasks:
+    - name: Verificar ejecutable de Ansible
+      ansible.builtin.command: which ansible
+      register: ansible_path
+      changed_when: false
+
+    - name: Mostrar versión de Ansible
+      ansible.builtin.command: ansible --version
+      register: ansible_version
+      changed_when: false
+
+    - name: Mostrar información de la versión
+      ansible.builtin.debug:
+        msg: |
+          Ruta de Ansible: {{ ansible_path.stdout }}
+          {{ ansible_version.stdout }}
+
+    - name: Verificar instalación de ansible-core
+      ansible.builtin.command: python3 -m pip show ansible-core
+      register: pip_show
+      changed_when: false
+      failed_when: false
+
+    - name: Validar versión de Python
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.python_version is version('3.8', '>=')
+        fail_msg: "Se requiere Python 3.8 o superior"
+        success_msg: "Python {{ ansible_facts.python_version }} OK"
+
+- name: Verificar módulos disponibles
+  hosts: control
+  gather_facts: no
+  tasks:
+    - name: Listar módulos del núcleo
+      ansible.builtin.command: ansible-doc -l | head -20
+      register: module_list
+      changed_when: false
+
+    - name: Mostrar módulos de gestión de paquetes
+      ansible.builtin.command: ansible-doc -l | grep -E '^(yum|dnf|package)' | head -10
+      register: package_modules
+      changed_when: false
+
+    - name: Mostrar resultado
+      ansible.builtin.debug:
+        msg: |
+          Primeros 20 módulos:
+          {{ module_list.stdout_lines | join('\n') }}

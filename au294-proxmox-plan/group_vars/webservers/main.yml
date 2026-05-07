@@ -1,0 +1,18 @@
+---
+# Variables específicas para servidores web
+webserver_packages:
+  - nginx
+  - php-fpm
+  - php-mysqlnd
+  - policycoreutils-python-utils
+
+webserver_port: 8080
+webserver_document_root: /var/www/html
+
+enable_php: true
+php_version: "8.0"
+
+enable_ssl: false
+
+monitoring_enabled: true
+monitoring_port: 9100

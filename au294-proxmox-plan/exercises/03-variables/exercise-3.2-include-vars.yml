@@ -1,0 +1,48 @@
+# Ejercicio 3.2: Include y Include_vars
+# AU294 - Chapter 3: Managing Variables and Inclusions
+
+- name: Demostrar inclusión de variables
+  hosts: managed
+  gather_facts: yes
+  vars:
+    config_dir: /opt/au294-config
+
+  tasks:
+    - name: Crear directorio de configuración
+      ansible.builtin.file:
+        path: "{{ config_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Incluir archivo de variables (demostración)
+      ansible.builtin.include_vars:
+        file: "{{ config_dir }}/app-vars.yml"
+      when: false
+
+    - name: Simular variables incluidas
+      ansible.builtin.set_fact:
+        app_name: myapplication
+        app_port: 9000
+        app_users:
+          - developer
+          - admin
+          - operator
+
+    - name: Mostrar variables incluidas
+      ansible.builtin.debug:
+        msg: |
+          App Name: {{ app_name }}
+          App Port: {{ app_port }}
+          Users: {{ app_users | join(', ') }}
+
+    - name: Iterar sobre usuarios de aplicación
+      ansible.builtin.debug:
+        msg: "Usuario: {{ item }}"
+      loop: "{{ app_users }}"
+
+    - name: Usar filtros Jinja2
+      ansible.builtin.debug:
+        msg: |
+          Nombre en mayúsculas: {{ app_name | upper }}
+          Puerto en texto: {{ app_port | string }}
+          Usuarios como lista: {{ app_users | to_json }}

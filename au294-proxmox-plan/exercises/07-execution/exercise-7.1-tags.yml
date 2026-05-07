@@ -1,0 +1,94 @@
+# Ejercicio 7.1: Uso de Etiquetas (Tags)
+# AU294 - Chapter 7: Managing playbook execution
+
+- name: Gestión de ejecución con etiquetas
+  hosts: managed
+  gather_facts: yes
+  vars:
+    install_packages:
+      - vim
+      - git
+      - wget
+    configure_users:
+      - { name: developer, shell: /bin/bash }
+      - { name: readonly, shell: /bin/false }
+
+  tasks:
+    - name: Actualizar sistema
+      ansible.builtin.dnf:
+        name: '*'
+        state: latest
+      tags:
+        - system
+        - update
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Instalar paquetes base
+      ansible.builtin.yum:
+        name: "{{ install_packages }}"
+        state: present
+      tags:
+        - packages
+        - install
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Instalar dependencias de monitoreo
+      ansible.builtin.yum:
+        name:
+          - prometheus
+          - node_exporter
+        state: present
+      tags:
+        - packages
+        - monitoring
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Crear usuarios
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        shell: "{{ item.shell }}"
+        create_home: yes
+      loop: "{{ configure_users }}"
+      tags:
+        - users
+        - configure
+
+    - name: Configurar SSH
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        backup: yes
+      loop:
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+      notify: Restart sshd
+      tags:
+        - security
+        - ssh
+
+    - name: Configurar firewall
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - ssh
+        - http
+        - https
+      tags:
+        - security
+        - firewall
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Verificar sistema
+      ansible.builtin.shell: echo "Verificación completada"
+      tags:
+        - verify
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted

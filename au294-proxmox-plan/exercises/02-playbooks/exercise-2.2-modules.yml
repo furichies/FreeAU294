@@ -1,0 +1,100 @@
+# Ejercicio 2.2: Módulos Básicos
+# AU294 - Chapter 2: Implementing Playbooks
+
+- name: Uso de módulos básicos de Ansible
+  hosts: managed
+  gather_facts: yes
+  vars:
+    app_user: webadmin
+    app_group: webgroup
+    packages:
+      - httpd
+      - mariadb-server
+      - php
+      - php-mysqlnd
+    services:
+      - httpd
+      - mariadb
+    firewall_ports:
+      - 80/tcp
+      - 443/tcp
+
+  tasks:
+    - name: Crear grupo de aplicación
+      ansible.builtin.group:
+        name: "{{ app_group }}"
+        state: present
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Crear usuario de aplicación
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        group: "{{ app_group }}"
+        comment: "Usuario de aplicación web"
+        shell: /bin/bash
+        home: "/home/{{ app_user }}"
+        create_home: yes
+        password: "{{ 'temppass123' | password_hash('sha512') }}"
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Instalar paquetes con yum
+      ansible.builtin.yum:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      when: ansible_facts.os_family == "RedHat"
+      notify: Restart httpd
+
+    - name: Asegurar que servicios estén activos
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop: "{{ services }}"
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Configurar firewall
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - http
+        - https
+      when: ansible_facts.os_family == "RedHat"
+      failed_when: false
+
+    - name: Crear página web de prueba
+      ansible.builtin.copy:
+        content: |
+          <html>
+          <head><title>AU294 Lab</title></head>
+          <body>
+          <h1>Laboratorio AU294</h1>
+          <p>Servidor: {{ inventory_hostname }}</p>
+          <p>Fecha: {{ ansible_facts.date_time.iso8601 }}</p>
+          </body>
+          </html>
+        dest: /var/www/html/index.html
+        owner: apache
+        group: apache
+        mode: '0644'
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Probar Apache
+      ansible.builtin.uri:
+        url: http://localhost
+        return_content: yes
+      register: apache_test
+      failed_when: false
+
+    - name: Mostrar resultado de Apache
+      ansible.builtin.debug:
+        msg: "Apache responde: {{ 'OK' if apache_test.status == 200 else 'ERROR' }}"
+
+  handlers:
+    - name: Restart httpd
+      ansible.builtin.service:
+        name: httpd
+        state: restarted

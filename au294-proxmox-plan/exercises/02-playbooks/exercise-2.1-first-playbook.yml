@@ -1,0 +1,48 @@
+# Ejercicio 2.1: Tu Primer Playbook
+# AU294 - Chapter 2: Implementing Playbooks
+
+- name: Primer Playbook - Hola Mundo
+  hosts: managed
+  gather_facts: yes
+  vars:
+    banner_color: "{{ ansible_facts.distribution == 'Rocky' and 'green' or 'blue' }}"
+
+  tasks:
+    - name: Mostrar mensaje de bienvenida
+      ansible.builtin.debug:
+        msg: |
+          =============================================
+          BIENVENIDO AL CURSO AU294
+          Red Hat Enterprise Linux Automation with Ansible
+          =============================================
+          Servidor: {{ inventory_hostname }}
+          Sistema: {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}
+          Fecha: {{ ansible_facts.date_time.iso8601 }}
+          =============================================
+
+    - name: Crear directorio de aplicación
+      ansible.builtin.file:
+        path: /opt/au294-app
+        state: directory
+        mode: '0755'
+
+    - name: Escribir archivo de estado
+      ansible.builtin.copy:
+        content: |
+          # Archivo de estado del laboratorio AU294
+          # Generated: {{ ansible_facts.date_time.iso8601 }}
+          hostname={{ inventory_hostname }}
+          distribution={{ ansible_facts.distribution }}
+          version={{ ansible_facts.distribution_version }}
+          ip={{ ansible_facts.default_ipv4.address }}
+        dest: /opt/au294-app/status.txt
+        mode: '0644'
+
+    - name: Verificar archivo creado
+      ansible.builtin.command: cat /opt/au294-app/status.txt
+      register: file_content
+      changed_when: false
+
+    - name: Mostrar contenido del archivo
+      ansible.builtin.debug:
+        var: file_content.stdout_lines

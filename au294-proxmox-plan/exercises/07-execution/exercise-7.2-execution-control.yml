@@ -1,0 +1,76 @@
+# Ejercicio 7.2: Control de ejecución avanzada
+# AU294 - Chapter 7: Managing playbook execution
+
+- name: Control de ejecución avanzada
+  hosts: managed
+  gather_facts: yes
+  vars:
+    deployment_version: "2.0"
+
+  tasks:
+    - name: Tarea inicial - preparación
+      ansible.builtin.debug:
+        msg: "Iniciando despliegue versión {{ deployment_version }}"
+      tags: init
+
+    - name: Crear directorio de aplicación
+      ansible.builtin.file:
+        path: /opt/app-{{ deployment_version }}
+        state: directory
+        mode: '0755'
+      tags: deploy
+
+    - name: Descargar aplicación
+      ansible.builtin.git:
+        repo: https://github.com/example/app.git
+        dest: /opt/app-{{ deployment_version }}/current
+        version: v{{ deployment_version }}
+        force: yes
+      tags: deploy
+      when: false
+
+    - name: Simular descarga
+      ansible.builtin.copy:
+        content: |
+          # Versión {{ deployment_version }}
+          name=myapp
+          version={{ deployment_version }}
+          date={{ ansible_facts.date_time.iso8601 }}
+        dest: /opt/app-{{ deployment_version }}/version.txt
+      tags: deploy
+
+    - name: Configurar aplicación
+      ansible.builtin.template:
+        src: templates/app.conf.j2
+        dest: /opt/app-{{ deployment_version }}/config.conf
+        mode: '0644'
+      tags:
+        - configure
+        - deploy
+      when: false
+
+    - name: Iniciar aplicación
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          echo "App version {{ deployment_version }} running"
+          tail -f /dev/null
+        dest: /opt/app-{{ deployment_version }}/start.sh
+        mode: '0755'
+      tags: deploy
+
+    - name: Tarea de verificación
+      ansible.builtin.command: ls -la /opt/app-{{ deployment_version }}/
+      register: app_files
+      changed_when: false
+      tags: verify
+
+    - name: Mostrar archivos
+      ansible.builtin.debug:
+        var: app_files.stdout_lines
+      tags: verify
+
+    - name: Tarea final - completado
+      ansible.builtin.debug:
+        msg: "Despliegue completado exitosamente"
+      tags: finish

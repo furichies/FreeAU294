@@ -1,0 +1,66 @@
+# Ejercicio 1.2: Comandos Ad-Hoc
+# AU294 - Chapter 1: Introduction to Ansible
+
+- name: Demostrar comandos ad-hoc básicos
+  hosts: managed
+  gather_facts: yes
+  vars:
+    demo_message: "Hola desde Ansible AU294"
+
+  tasks:
+    - name: Obtener hostname de los nodos
+      ansible.builtin.command: hostname
+      register: hostname_result
+      changed_when: false
+
+    - name: Mostrar información del nodo
+      ansible.builtin.debug:
+        msg: |
+          Hostname: {{ hostname_result.stdout }}
+          Dirección IP: {{ ansible_facts.default_ipv4.address }}
+          Distribución: {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}
+          Arquitectura: {{ ansible_facts.architecture }}
+
+    - name: Verificar espacio en disco
+      ansible.builtin.shell: df -h | grep -E '/$|Filesystem'
+      register: disk_usage
+      changed_when: false
+
+    - name: Mostrar uso de disco
+      ansible.builtin.debug:
+        var: disk_usage.stdout_lines
+
+    - name: Verificar memoria disponible
+      ansible.builtin.shell: free -h
+      register: memory
+      changed_when: false
+
+    - name: Mostrar memoria
+      ansible.builtin.debug:
+        var: memory.stdout_lines
+
+    - name: Listar puertos en escucha
+      ansible.builtin.shell: ss -tlnp 2>/dev/null || netstat -tlnp
+      register: listening_ports
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar puertos
+      ansible.builtin.debug:
+        msg: "{{ listening_ports.stdout_lines }}"
+
+    - name: Verificar servicios activos
+      ansible.builtin.systemd:
+        list_units: "*"
+      register: services
+      changed_when: false
+      when: false
+
+    - name: Mostrar servicios de red activos
+      ansible.builtin.shell: systemctl list-units --type=service --state=running | grep -E 'ssh|http|ntp|dns' || echo "Sin servicios de red activos"
+      register: running_services
+      changed_when: false
+
+    - name: Resultado de servicios
+      ansible.builtin.debug:
+        msg: "{{ running_services.stdout_lines }}"

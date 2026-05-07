@@ -1,0 +1,79 @@
+# Ejercicio 10.3: Registro centralizado con Rsyslog
+# AU294 - Chapter 10: Integration with other technologies
+
+- name: Configurar Rsyslog centralizado
+  hosts: managed
+  gather_facts: yes
+  vars:
+    rsyslog_server: 10.10.10.10
+    rsyslog_port: 514
+    log_facility: local0
+    application_name: au294-app
+
+  tasks:
+    - name: Instalar Rsyslog
+      ansible.builtin.dnf:
+        name: rsyslog
+        state: present
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Verificar Rsyslog
+      ansible.builtin.service:
+        name: rsyslog
+        state: started
+        enabled: yes
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Configurar cliente Rsyslog
+      ansible.builtin.copy:
+        dest: /etc/rsyslog.d/au294-client.conf
+        content: |
+          # Configuración de cliente AU294
+          # Envía logs a {{ rsyslog_server }}
+
+          # template para formato
+          $template Au294Format,"%TIMESTAMP% {{ application_name }} %HOSTNAME% %syslogtag%%msg:::sp-if-no-1st-sp%%msg%\n"
+
+          # regla para enviar logs de {{ application_name }}
+          if $programname contains '{{ application_name }}' then {
+            action(type="omfwd"
+              Target="{{ rsyslog_server }}"
+              Port="{{ rsyslog_port }}"
+              Protocol="udp"
+              template="Au294Format")
+            stop
+          }
+        mode: '0644'
+
+    - name: Reiniciar Rsyslog
+      ansible.builtin.service:
+        name: rsyslog
+        state: restarted
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Generar log de prueba
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Generador de logs de prueba para AU294
+          TAG="au294-app"
+
+          for i in {1..5}; do
+            logger -t "$TAG" "Log de prueba $i desde {{ inventory_hostname }}"
+            sleep 1
+          done
+        dest: /opt/au294-scripts/gen-test-logs.sh
+        mode: '0755'
+
+    - name: Ejecutar generador de logs
+      ansible.builtin.command: /opt/au294-scripts/gen-test-logs.sh
+      changed_when: false
+
+    - name: Verificar últimos logs
+      ansible.builtin.command: tail -10 /var/log/messages
+      register: recent_logs
+      changed_when: false
+
+    - name: Mostrar logs recientes
+      ansible.builtin.debug:
+        msg: "{{ recent_logs.stdout_lines[-5:] }}"

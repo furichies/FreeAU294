@@ -1,0 +1,126 @@
+# Ejercicio 2.3: Playbook Completo de Aplicación Web
+# AU294 - Chapter 2: Implementing Playbooks
+
+- name: Desplegar aplicación web completa
+  hosts: webservers
+  gather_facts: yes
+  vars:
+    http_port: 8080
+    app_dir: /opt/webapp
+    app_owner: nginx
+    app_group: nginx
+    db_name: webapp_db
+    db_user: webapp_user
+    db_password: "{{ vault_db_password | default('changeme123') }}"
+
+  tasks:
+    - name: Instalar dependencias
+      ansible.builtin.dnf:
+        name:
+          - nginx
+          - mariadb-server
+          - php-fpm
+          - php-mysqlnd
+          - policycoreutils-python-utils
+        state: present
+        update_cache: yes
+
+    - name: Crear usuario y grupo
+      ansible.builtin.group:
+        name: "{{ app_group }}"
+        state: present
+      notify: Restart nginx
+
+    - name: Crear directorio de aplicación
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_owner }}"
+        group: "{{ app_group }}"
+        mode: '0755'
+
+    - name: Desplegar archivos de aplicación
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/files/webapp/"
+        dest: "{{ app_dir }}/"
+        owner: "{{ app_owner }}"
+        group: "{{ app_group }}"
+        mode: '0644'
+      notify: Restart nginx
+
+    - name: Configurar SELinux para Nginx
+      ansible.posix.seboolean:
+        name: nginx_anon_write
+        state: yes
+        persistent: yes
+      when: ansible_facts.selinux.status == "enabled"
+
+    - name: Configurar PHP-FPM
+      ansible.builtin.lineinfile:
+        path: /etc/php-fpm.d/www.conf
+        regexp: '^listen ='
+        line: "listen = 127.0.0.1:{{ http_port }}"
+        backup: yes
+      notify: Restart php-fpm
+
+    - name: Configurar Nginx
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/templates/nginx.conf.j2"
+        dest: /etc/nginx/conf.d/webapp.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart nginx
+      when: false
+
+    - name: Iniciar servicios
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - nginx
+        - php-fpm
+        - mariadb
+
+    - name: Configurar base de datos
+      ansible.builtin.mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_user: root
+        login_password: ""
+      notify: Restart mariadb
+
+    - name: Crear usuario de base de datos
+      ansible.builtin.mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        priv: '{{ db_name }}.*:ALL'
+        host: localhost
+        state: present
+
+    - name: Verificar aplicación
+      ansible.builtin.uri:
+        url: "http://{{ ansible_facts.default_ipv4.address }}:{{ http_port }}"
+        method: GET
+      register: app_test
+
+    - name: Mostrar resultado
+      ansible.builtin.debug:
+        msg: "Aplicación desplegada en http://{{ ansible_facts.default_ipv4.address }}:{{ http_port }}"
+
+  handlers:
+    - name: Restart nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
+
+    - name: Restart php-fpm
+      ansible.builtin.service:
+        name: php-fpm
+        state: restarted
+
+    - name: Restart mariadb
+      ansible.builtin.service:
+        name: mariadb
+        state: restarted

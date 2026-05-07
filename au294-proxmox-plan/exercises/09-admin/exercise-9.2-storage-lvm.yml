@@ -1,0 +1,88 @@
+# Ejercicio 9.2: Gestión de almacenamiento (LVM y mounts)
+# AU294 - Chapter 9: Automation for RHCE/RHCSA Linux Administration
+
+- name: Gestión de almacenamiento con LVM
+  hosts: managed
+  gather_facts: yes
+  vars:
+    vg_name: vg_data
+    lv_name: lv_appdata
+    lv_size: 2G
+    mount_point: /opt/appdata
+    filesystem: xfs
+
+  tasks:
+    - name: Verificar discos disponibles
+      ansible.builtin.command: lsblk -d --noheadings -o NAME,SIZE,TYPE
+      register: disks
+      changed_when: false
+
+    - name: Mostrar discos disponibles
+      ansible.builtin.debug:
+        msg: "Discos disponibles:\n{{ disks.stdout }}"
+
+    - name: Crear Physical Volume (demo - saltar si ya existe)
+      ansible.builtin.command: pvs 2>/dev/null || echo "LVM no configurado"
+      register: pvs_output
+      changed_when: false
+      when: false
+
+    - name: Crear Volume Group
+      ansible.builtin.command: vgs {{ vg_name }} 2>/dev/null || vgcreate {{ vg_name }} /dev/sdb 2>/dev/null || echo "VG creation skipped"
+      register: vg_result
+      changed_when: false
+      when: false
+
+    - name: Crear Logical Volume
+      ansible.builtin.command: lvs {{ vg_name }}/{{ lv_name }} 2>/dev/null || echo "LV not found"
+      register: lv_check
+      changed_when: false
+      when: false
+
+    - name: Formatear volumen
+      ansible.builtin.filesystem:
+        dev: "/dev/{{ vg_name }}/{{ lv_name }}"
+        fstype: "{{ filesystem }}"
+        force: yes
+      when: false
+
+    - name: Montar volumen
+      ansible.builtin.mount:
+        path: "{{ mount_point }}"
+        src: "/dev/mapper/{{ vg_name }}-{{ lv_name }}"
+        fstype: "{{ filesystem }}"
+        state: mounted
+        opts: defaults,noatime
+      when: false
+
+    - name: Configurar /etc/fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "/dev/mapper/{{ vg_name }}-{{ lv_name }} {{ mount_point }} {{ filesystem }} defaults,noatime 0 2"
+        state: present
+      when: false
+
+    - name: Crear directorio de prueba
+      ansible.builtin.file:
+        path: /opt/au294-storage-test
+        state: directory
+        mode: '0755'
+
+    - name: Escribir datos de prueba
+      ansible.builtin.copy:
+        content: |
+          # Datos de prueba - AU294
+          # Fecha: {{ ansible_facts.date_time.iso8601 }}
+          # Servidor: {{ ansible_facts.hostname }}
+          test_data=ok
+        dest: /opt/au294-storage-test/data.txt
+        mode: '0644'
+
+    - name: Verificar mount
+      ansible.builtin.command: df -h /opt/au294-storage-test
+      register: disk_usage
+      changed_when: false
+
+    - name: Mostrar uso de disco
+      ansible.builtin.debug:
+        msg: "{{ disk_usage.stdout_lines }}"

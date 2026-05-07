@@ -1,0 +1,62 @@
+# Ejercicio 3.1: Definición y Uso de Variables
+# AU294 - Chapter 3: Managing Variables and Inclusions
+
+- name: Gestión de Variables
+  hosts: managed
+  gather_facts: yes
+  vars:
+    environment: development
+    app_version: "1.0.0"
+    admin_email: admin@au294.local
+    log_level: info
+
+  tasks:
+    - name: Mostrar variables de nivel de playbook
+      ansible.builtin.debug:
+        msg: |
+          Environment: {{ environment }}
+          App Version: {{ app_version }}
+          Admin: {{ admin_email }}
+
+    - name: Definir variables de tarea
+      ansible.builtin.set_fact:
+        deployment_id: "{{ ansible_facts.hostname }}-{{ ansible_facts.date_time.iso8601_basic_short }}"
+        server_role: "{{ 'control' if inventory_hostname.startswith('ansible') else 'managed' }}"
+
+    - name: Mostrar variables dinámicas
+      ansible.builtin.debug:
+        msg: |
+          Deployment ID: {{ deployment_id }}
+          Server Role: {{ server_role }}
+
+    - name: Usar variables en comandos
+      ansible.builtin.shell: |
+        echo "=== Server Info ===" > /tmp/server-info.txt
+        echo "Hostname: {{ ansible_facts.hostname }}" >> /tmp/server-info.txt
+        echo "IP: {{ ansible_facts.default_ipv4.address }}" >> /tmp/server-info.txt
+        echo "OS: {{ ansible_facts.distribution }}" >> /tmp/server-info.txt
+        echo "Role: {{ server_role }}" >> /tmp/server-info.txt
+
+    - name: Verificar archivo creado
+      ansible.builtin.command: cat /tmp/server-info.txt
+      register: file_output
+      changed_when: false
+
+    - name: Mostrar contenido
+      ansible.builtin.debug:
+        var: file_output.stdout_lines
+
+- name: Variables de grupo en inventory
+  hosts: all
+  gather_facts: no
+  vars:
+    datacenter: lab-au294
+    lab_purpose: training
+
+  tasks:
+    - name: Mostrar variables de grupo
+      ansible.builtin.debug:
+        msg: |
+          Datacenter: {{ datacenter }}
+          Lab Purpose: {{ lab_purpose }}
+          Host: {{ inventory_hostname }}

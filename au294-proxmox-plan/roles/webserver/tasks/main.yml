@@ -1,0 +1,59 @@
+---
+- name: Install webserver packages
+  ansible.builtin.yum:
+    name: "{{ webserver_packages }}"
+    state: present
+    update_cache: yes
+  when: ansible_facts.os_family == "RedHat"
+  notify: Restart webserver
+
+- name: Configure SELinux for webserver
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: yes
+    persistent: yes
+  when: ansible_facts.selinux.status == "enabled"
+
+- name: Create document root
+  ansible.builtin.file:
+    path: "{{ webserver_document_root }}"
+    state: directory
+    owner: nginx
+    group: nginx
+    mode: '0755'
+
+- name: Create webroot directory
+  ansible.builtin.file:
+    path: /var/www/html
+    state: directory
+    mode: '0755'
+  when: webserver_document_root is not defined
+
+- name: Deploy default index page
+  ansible.builtin.copy:
+    content: |
+      <html>
+      <head><title>AU294 Lab</title></head>
+      <body>
+      <h1>Welcome to AU294 Ansible Automation Lab</h1>
+      <p>Server: {{ inventory_hostname }}</p>
+      <p>Date: {{ ansible_facts.date_time.iso8601 }}</p>
+      </body>
+      </html>
+    dest: "{{ webserver_document_root | default('/var/www/html') }}/index.html"
+    owner: nginx
+    group: nginx
+    mode: '0644'
+
+- name: Create health check endpoint
+  ansible.builtin.copy:
+    content: |
+      {"status": "ok", "hostname": "{{ inventory_hostname }}", "timestamp": "{{ ansible_facts.date_time.iso8601 }}"}
+    dest: "{{ webserver_document_root | default('/var/www/html') }}/health"
+    mode: '0644'
+
+- name: Start and enable webserver
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: yes

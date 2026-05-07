@@ -1,0 +1,16 @@
+---
+# Variables específicas para managed-node-01
+node_description: "Servidor de aplicaciones primario"
+node_role: app-primary
+
+app_instances:
+  - name: webapp
+    port: 8080
+    protocol: http
+  - name: api
+    port: 9000
+    protocol: http
+
+custom_packages:
+  - postgresql-contrib
+  - redis

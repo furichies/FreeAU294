@@ -1,0 +1,12 @@
+---
+# Variables específicas para managed-node-02
+node_description: "Servidor de aplicaciones secundario"
+node_role: app-secondary
+
+app_instances:
+  - name: webapp
+    port: 8080
+    protocol: http
+
+custom_packages:
+  - nginx

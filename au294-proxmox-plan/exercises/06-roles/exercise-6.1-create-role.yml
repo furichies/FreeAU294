@@ -1,0 +1,53 @@
+# Ejercicio 6.1: Crear un Rol de Ansible
+# AU294 - Chapter 6: Ansible Roles
+
+- name: Desplegar rol webserver
+  hosts: webservers
+  gather_facts: yes
+  vars:
+    webserver_packages:
+      - nginx
+      - php-fpm
+    webserver_port: 8080
+    webserver_document_root: /var/www/html
+    webserver_enable_status: true
+
+  tasks:
+    - name: Incluir rol webserver
+      ansible.builtin.include_role:
+        name: webserver
+      vars:
+        webserver_packages: "{{ webserver_packages }}"
+        webserver_port: "{{ webserver_port }}"
+        webserver_document_root: "{{ webserver_document_root }}"
+
+- name: Validar rol webserver
+  hosts: webservers
+  gather_facts: yes
+
+  tasks:
+    - name: Verificar que Nginx está instalado
+      ansible.builtin.command: nginx -v
+      register: nginx_version
+      changed_when: false
+      failed_when: false
+
+    - name: Verificar puerto de escucha
+      ansible.builtin.shell: ss -tlnp | grep {{ webserver_port | default(8080) }}
+      register: listening_port
+      changed_when: false
+      failed_when: false
+
+    - name: Probar endpoint de salud
+      ansible.builtin.uri:
+        url: "http://{{ ansible_facts.default_ipv4.address }}:{{ webserver_port | default(8080) }}/health"
+        method: GET
+      register: health_check
+      failed_when: false
+
+    - name: Mostrar resultado de validación
+      ansible.builtin.debug:
+        msg: |
+          Nginx: {{ nginx_version.stdout }}
+          Puerto: {{ listening_port.stdout_lines }}
+          Health: {{ health_check.status }}

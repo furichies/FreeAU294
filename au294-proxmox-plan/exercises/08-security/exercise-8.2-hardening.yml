@@ -1,0 +1,127 @@
+# Ejercicio 8.2: Hardening de servidor
+# AU294 - Chapter 8: Securing your automation
+
+- name: Hardening de servidores Linux
+  hosts: managed
+  gather_facts: yes
+  vars:
+    ssh_port: 22
+    allowed_ssh_users:
+      - root
+      - admin
+    firewall_rules:
+      - service: ssh
+        permanent: yes
+        state: enabled
+      - port: 80/tcp
+        permanent: yes
+        state: enabled
+      - port: 443/tcp
+        permanent: yes
+        state: enabled
+
+  tasks:
+    - name: Deshabilitar servicios innecesarios
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop:
+        - cups
+        - postfix
+      when: ansible_facts.os_family == "RedHat"
+      failed_when: false
+
+    - name: Configurar firewall
+      ansible.posix.firewalld:
+        service: "{{ item.service }}"
+        permanent: "{{ item.permanent }}"
+        state: "{{ item.state }}"
+        immediate: yes
+      loop: "{{ firewall_rules }}"
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Configurar reglas de firewall con puertos
+      ansible.posix.firewalld:
+        port: "{{ item.port }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - 8080/tcp
+        - 9090/tcp
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Configurar seguridad de SSH
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.key }}"
+        line: "{{ item.value }}"
+        backup: yes
+      loop:
+        - key: '^#?PermitRootLogin'
+          value: 'PermitRootLogin no'
+        - key: '^#?PubkeyAuthentication'
+          value: 'PubkeyAuthentication yes'
+        - key: '^#?PasswordAuthentication'
+          value: 'PasswordAuthentication no'
+        - key: '^#?MaxAuthTries'
+          value: 'MaxAuthTries 3'
+        - key: '^#?ClientAliveInterval'
+          value: 'ClientAliveInterval 300'
+        - key: '^#?ClientAliveCountMax'
+          value: 'ClientAliveCountMax 2'
+      notify: Restart sshd
+
+    - name: Configurar política de contraseñas
+      ansible.builtin.lineinfile:
+        path: /etc/security/pwquality.conf
+        regexp: '^#?{{ item.key }}'
+        line: "{{ item.key }} = {{ item.value }}"
+      loop:
+        - key: minlen
+          value: '12'
+        - key: dcredit
+          value: '-1'
+        - key: ucredit
+          value: '-1'
+        - key: lcredit
+          value: '-1'
+        - key: ocredit
+          value: '-1'
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Configurar fail2ban (si está disponible)
+      ansible.builtin.yum:
+        name: fail2ban
+        state: present
+      when: ansible_facts.os_family == "RedHat"
+      failed_when: false
+
+    - name: Habilitar auditd
+      ansible.builtin.service:
+        name: auditd
+        state: started
+        enabled: yes
+      when: ansible_facts.os_family == "RedHat"
+
+    - name: Verificar configuración de seguridad
+      ansible.builtin.shell: |
+        echo "=== Seguridad del Sistema ==="
+        echo "SSH MaxAuthTries:"
+        grep MaxAuthTries /etc/ssh/sshd_config || echo "No configurado"
+        echo "Firewall rules:"
+        firewall-cmd --list-all 2>/dev/null || echo "Firewall no activo"
+      register: security_report
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar reporte de seguridad
+      ansible.builtin.debug:
+        msg: "{{ security_report.stdout_lines }}"
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted

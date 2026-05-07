@@ -1,0 +1,43 @@
+# Configuracion de Aplicacion - AU294
+# Generado automaticamente por Ansible
+
+[application]
+name={{ app_name | default("myapplication") }}
+version={{ app_version | default("1.0.0") }}
+environment={{ environment | default("development") }}
+
+[network]
+host={{ app_host | default("0.0.0.0") }}
+port={{ app_port | default(8080) }}
+protocol={{ app_protocol | default("http") }}
+
+{% if ssl_enabled | default(false) %}
+[ssl]
+enabled=true
+cert={{ ssl_cert_path | default("/etc/ssl/certs/app.crt") }}
+key={{ ssl_key_path | default("/etc/ssl/private/app.key") }}
+{% endif %}
+
+[database]
+{% if db_type is defined %}
+type={{ db_type }}
+host={{ db_host | default("localhost") }}
+port={{ db_port | default(3306) }}
+name={{ db_name | default("appdb") }}
+user={{ db_user | default("appuser") }}
+{% endif %}
+
+[logging]
+level={{ log_level | default("info") }}
+path={{ log_path | default("/var/log/app") }}
+
+[security]
+{% if api_key is defined %}
+api_key={{ api_key }}
+{% endif %}
+secret={{ secret | default("changeme") }}
+
+[features]
+{% for feature in features | default(['monitoring', 'logging']) %}
+{{ feature }}=enabled
+{% endfor %}

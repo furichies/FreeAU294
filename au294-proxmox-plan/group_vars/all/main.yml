@@ -1,0 +1,34 @@
+---
+# Variables globales para todo el laboratorio AU294
+environment: training
+datacenter: lab-au294
+ansible_user: root
+ansible_python_interpreter: /usr/bin/python3
+
+# Configuración de red
+lab_network: 10.10.10.0/24
+lab_gateway: 10.10.10.1
+lab_dns:
+  - 8.8.8.8
+  - 8.8.4.4
+
+# Configuración de timezone
+timezone: Europe/Madrid
+
+# Configuración de servicios
+enable_monitoring: false
+enable_logging: true
+enable_backups: false
+
+# Configuración de seguridad
+ssh_port: 22
+ssh_permit_root_login: false
+ssh_pubkey_auth: true
+
+# Configuración de firewall
+firewall_enabled: true
+firewall_default_policy: drop
+firewall_allowed_services:
+  - ssh
+  - http
+  - https

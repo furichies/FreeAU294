@@ -1,0 +1,48 @@
+# Ejercicio 3.3: Plantillas Jinja2
+# AU294 - Chapter 3: Managing Variables and Inclusions
+
+- name: Uso de plantillas Jinja2
+  hosts: managed
+  gather_facts: yes
+  vars:
+    motd_header: |
+      =============================================
+      LABORATORIO AU294 - PROHIBIDO USO NO AUTORIZADO
+      =============================================
+
+  tasks:
+    - name: Crear directorio para plantillas
+      ansible.builtin.file:
+        path: /opt/au294-templates
+        state: directory
+        mode: '0755'
+
+    - name: Desplegar MOTD personalizado
+      ansible.builtin.template:
+        src: templates/motd.j2
+        dest: /etc/motd
+        mode: '0644'
+
+    - name: Verificar MOTD
+      ansible.builtin.command: cat /etc/motd
+      register: motd_content
+      changed_when: false
+
+    - name: Mostrar MOTD
+      ansible.builtin.debug:
+        msg: "{{ motd_content.stdout_lines }}"
+
+    - name: Crear configuración de aplicación
+      ansible.builtin.template:
+        src: templates/app-config.j2
+        dest: /opt/au294-config/app.conf
+        mode: '0644'
+
+    - name: Mostrar configuración generada
+      ansible.builtin.command: cat /opt/au294-config/app.conf
+      register: app_conf
+      changed_when: false
+
+    - name: Mostrar configuración
+      ansible.builtin.debug:
+        msg: "{{ app_conf.stdout }}"
